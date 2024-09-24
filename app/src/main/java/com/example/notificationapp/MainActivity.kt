@@ -8,8 +8,10 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,7 +39,9 @@ import androidx.core.net.toUri
 import com.example.notificationapp.ui.theme.NotificationAppTheme
 
 class MainActivity : ComponentActivity() {
+
     private var isDialogShown = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -45,6 +50,12 @@ class MainActivity : ComponentActivity() {
         createNotificationChannel()
 
         setContent {
+
+            if (isDialogShown.value)
+                PermissionDeniedDialog {    // Body of the callback function when you want to call it
+                    isDialogShown.value = false
+                }
+
             NotificationAppTheme {
                 Box(
                     contentAlignment = Alignment.Center,
@@ -70,15 +81,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handelPermissionResponse(): ActivityResultLauncher<String> {
-
         val launcher =
             registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
 
                 if (isGranted) {
                     sendNotification()
-                }
-                else {
-                 // dialog here
+                } else {
+                    isDialogShown.value = true
                 }
 
             }
@@ -101,7 +110,7 @@ class MainActivity : ComponentActivity() {
         val link = "https://developer.android.com/compose".toUri()
         val i = Intent(Intent.ACTION_VIEW, link)
         val pendingIntent = PendingIntent
-            .getActivity(this, 101 , i , PendingIntent.FLAG_IMMUTABLE)
+            .getActivity(this, 101, i, PendingIntent.FLAG_IMMUTABLE)
 
         val notification = NotificationCompat.Builder(this, "1")
             .setSmallIcon(R.drawable.ic_flower)
@@ -115,22 +124,33 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun PermissionDeniedDialog(modifier: Modifier = Modifier) {
+    fun PermissionDeniedDialog(OnDialogShown: () -> Unit) {    // callback function
         AlertDialog(
-            onDismissRequest = {}, //cancelable = false  the app will freeze until the dialog is dismissed
+            onDismissRequest = { OnDialogShown() }, //cancelable = false  the app will freeze until the dialog is dismissed
             confirmButton = {
-                TextButton(onClick = { }) {
+                TextButton(onClick = {
+                   val i = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    i.data = Uri.fromParts("package", packageName, null)
+                    startActivity(i)
+                    OnDialogShown()
+                }
+
+                )
+
+                {
                     Text(text = "Allow")
                 }
             }, // positive button
             dismissButton = {
-                TextButton(onClick = { }) {
+                TextButton(onClick = { OnDialogShown() }) {
                     Text(text = "Cancel")
                 }
             }, // negative button
             icon = {
                 Icon(
-                    painter = painterResource(id = R.drawable.ic_warning) , contentDescription = "Warning"
+                    painter = painterResource(id = R.drawable.ic_warning),
+                    contentDescription = "Warning",
+                    tint = LocalContentColor.current
                 )
             },
             title = {
